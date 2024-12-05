@@ -66,3 +66,4 @@ if (bearishDivergence)
 // 可选：在图表下方绘制MACD柱状图
 plot(macdHist, title="MACD Histogram", color=(macdHist >= 0) ? color.green : color.red, style=plot.style_histogram, linewidth=1)
 hline(0, "Zero Line", color=color.gray)
+
