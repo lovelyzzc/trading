@@ -1,0 +1,68 @@
+//@version=5
+indicator("MACD Divergence Indicator", overlay=true)
+
+// MACD参数
+fastLength = input.int(12, title="Fast EMA Length")
+slowLength = input.int(26, title="Slow EMA Length")
+signalSmoothing = input.int(9, title="Signal Line Smoothing")
+
+// 计算MACD
+[macdLine, signalLine, _] = ta.macd(close, fastLength, slowLength, signalSmoothing)
+macdHist = macdLine - signalLine
+
+// 识别价格的局部高低点
+pricePivotLow = ta.pivotlow(low, 5, 5)
+pricePivotHigh = ta.pivothigh(high, 5, 5)
+
+// 识别MACD的局部高低点
+macdPivotLow = ta.pivotlow(macdHist, 5, 5)
+macdPivotHigh = ta.pivothigh(macdHist, 5, 5)
+
+// 计算过去10根K线的最低价和MACD最低值
+lowestLow = ta.lowest(low, 10)
+lowestMacd = ta.lowest(macdHist, 10)
+
+// 计算过去10根K线的最高价和MACD最高值
+highestHigh = ta.highest(high, 10)
+highestMacd = ta.highest(macdHist, 10)
+
+// 存储最近的高低点
+var float lastPriceLow = na
+var float lastPriceHigh = na
+var float lastMacdLow = na
+var float lastMacdHigh = na
+
+if (not na(pricePivotLow))
+    lastPriceLow := low[5]
+if (not na(macdPivotLow))
+    lastMacdLow := macdHist[5]
+if (not na(pricePivotHigh))
+    lastPriceHigh := high[5]
+if (not na(macdPivotHigh))
+    lastMacdHigh := macdHist[5]
+
+// 检查看涨背离
+bullishDivergence = false
+if (not na(lastPriceLow) and not na(lastMacdLow))
+    // 当前低点低于过去10根K线的最低价，且MACD低点高于过去10根K线的最低值
+    bullishDivergence := (lastPriceLow < lowestLow) and (lastMacdLow > lowestMacd)
+
+// 检查看跌背离
+bearishDivergence = false
+if (not na(lastPriceHigh) and not na(lastMacdHigh))
+    // 当前高点高于过去10根K线的最高价，且MACD高点低于过去10根K线的最高值
+    bearishDivergence := (lastPriceHigh > highestHigh) and (lastMacdHigh < highestMacd)
+
+// 绘制看涨背离信号
+if (bullishDivergence)
+    label.new(bar_index[5], low[5], "Bullish Divergence", 
+              style=label.style_label_up, color=color.green, textcolor=color.white, size=size.small)
+
+// 绘制看跌背离信号
+if (bearishDivergence)
+    label.new(bar_index[5], high[5], "Bearish Divergence", 
+              style=label.style_label_down, color=color.red, textcolor=color.white, size=size.small)
+
+// 可选：在图表下方绘制MACD柱状图
+plot(macdHist, title="MACD Histogram", color=(macdHist >= 0) ? color.green : color.red, style=plot.style_histogram, linewidth=1)
+hline(0, "Zero Line", color=color.gray)
