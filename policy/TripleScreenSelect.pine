@@ -1,0 +1,117 @@
+//@version=5
+indicator("三重滤网选股器 (动力系统+强力指数)", shorttitle="TripleScreenSelect", overlay=false, explicit_plot_zorder=true)
+
+// ======== 输入参数 ========
+// --- 周线动力系统参数 ---
+wEmaLen = input.int(13, title="周线EMA周期", group="周线动力系统", minval=1)
+wMacdFast = input.int(12, title="周线MACD快线", group="周线动力系统", minval=1)
+wMacdSlow = input.int(26, title="周线MACD慢线", group="周线动力系统", minval=1)
+wMacdSignal = input.int(9, title="周线MACD信号线", group="周线动力系统", minval=1)
+
+// --- 日线强力指数参数 ---
+dFiEmaLen = input.int(2, title="日线强力指数EMA周期", group="日线强力指数", minval=1)
+// (可选) FI极值判断的回顾期 (日线周期数，例如20日约为4周)
+// fiLookbackForExtremes = input.int(20, title="FI极值判断回顾期(日)", group="日线强力指数", minval=5)
+
+
+// ======== 自定义函数 ========
+// --- 计算动力系统状态 ---
+// 返回值: 1 (Green), -1 (Red), 0 (Blue)
+f_impulseSystem(src, emaLen, macdFast, macdSlow, macdSig) =>
+    emaVal = ta.ema(src, emaLen)
+    [macdLine, signalLine, histLine] = ta.macd(src, macdFast, macdSlow, macdSig)
+
+    emaIsRising = emaVal > emaVal[1]
+    emaIsFalling = emaVal < emaVal[1]
+    histIsRising = histLine > histLine[1]
+    histIsFalling = histLine < histLine[1]
+
+    resStatus = 0 // Blue (中性)
+    if (emaIsRising and histIsRising)
+        resStatus := 1 // Green (看涨)
+    else if (emaIsFalling and histIsFalling)
+        resStatus := -1 // Red (看跌)
+    resStatus
+
+// ======== 周线数据获取与处理 (第一层滤网) ========
+// 请求周线收盘价并计算周线动力系统状态
+// lookahead=barmerge.lookahead_on: 获取的是已完成的上一周期的周线数据，更稳定。
+// 对于选股器，通常使用lookahead_on，因为它评估的是已确定的状态。
+weeklyImpulseStatus = request.security(syminfo.tickerid, "W", f_impulseSystem(close, wEmaLen, wMacdFast, wMacdSlow, wMacdSignal), lookahead=barmerge.lookahead_on)
+
+
+// ======== 日线数据计算与处理 (第二层滤网) ========
+// --- 计算日线强力指数 ---
+dailyForceIndex = (close - close[1]) * volume
+dailyFiEma = ta.ema(dailyForceIndex, dFiEmaLen)
+
+// --- (可选) 判断FI EMA是否处于近期极值区域的辅助 ---
+// 暂时不直接加入核心信号，但可以作为辅助plot或未来增强
+// dailyFiEmaLowestPrev = ta.lowest(dailyFiEma[1], fiLookbackForExtremes) // 昨日之前的N日最低
+// dailyFiEmaHighestPrev = ta.highest(dailyFiEma[1], fiLookbackForExtremes) // 昨日之前的N日最高
+
+// isFiNotNewLow = dailyFiEma > dailyFiEmaLowestPrev
+// isFiNotNewHigh = dailyFiEma < dailyFiEmaHighestPrev
+
+
+// ======== 整合信号生成 ========
+var float screenerPlotValue = 0.0 // 初始化选股器输出值
+
+// --- 根据周线动力系统状态决定日线强力指数的解读 ---
+if (weeklyImpulseStatus == 1) // 周线看涨 (Green)
+    // 寻找日线买入信号: FI EMA < 0
+    if (dailyFiEma < 0)
+        // 细化信号：
+        // 1.5: 强买入信号 (FI EMA 在0下方开始上升)
+        // 1.0: 一般买入信号 (FI EMA 刚跌破0或仍在0下方)
+        if (dailyFiEma > dailyFiEma[1] and dailyFiEma[1] < 0) // 从0下方开始上升
+            screenerPlotValue := 1.5
+        else if (dailyFiEma < 0 and dailyFiEma[1] >= 0) // 刚跌破0
+            screenerPlotValue := 1.0
+        else if (dailyFiEma < 0) // 仍在0下方（可作为观察，或简化为1.0）
+            screenerPlotValue := 1.0 // 简化处理，只要在0以下即视为满足条件
+        else
+            screenerPlotValue := 0.0 // 其他0以下情况不明确
+    else
+        screenerPlotValue := 0.0 // FI EMA 不满足看涨回调条件
+
+else if (weeklyImpulseStatus == -1) // 周线看跌 (Red)
+    // 寻找日线卖出/做空信号: FI EMA > 0
+    if (dailyFiEma > 0)
+        // 细化信号：
+        // -1.5: 强卖出信号 (FI EMA 在0上方开始下降)
+        // -1.0: 一般卖出信号 (FI EMA 刚突破0或仍在0上方)
+        if (dailyFiEma < dailyFiEma[1] and dailyFiEma[1] > 0) // 从0上方开始下降
+            screenerPlotValue := -1.5
+        else if (dailyFiEma > 0 and dailyFiEma[1] <= 0) // 刚突破0
+            screenerPlotValue := -1.0
+        else if (dailyFiEma > 0) // 仍在0上方（可作为观察，或简化为-1.0）
+            screenerPlotValue := -1.0 // 简化处理
+        else
+            screenerPlotValue := 0.0
+    else
+        screenerPlotValue := 0.0 // FI EMA 不满足看跌反弹条件
+
+else // 周线中性 (Blue) or 其他未知状态
+    screenerPlotValue := 0.0
+
+
+// ======== PLOT 输出 ========
+// --- 主要用于选股器的信号值 ---
+// 将此值输出到数据窗口，选股器可以读取它
+plot(screenerPlotValue, title="选股器信号", color=color.new(color.blue, 0), display=display.data_window)
+
+// --- (可选) 辅助绘图，用于在图表上直观验证 ---
+// plot(weeklyImpulseStatus, title="周线动力系统状态", color=weeklyImpulseStatus==1 ? color.green : weeklyImpulseStatus==-1 ? color.red : color.blue, style=plot.style_histogram, linewidth=2)
+plot(dailyFiEma, title="日线FI EMA(2)", color=color.orange)
+// hline(0, "FI零轴", color=color.gray, linestyle=hline.style_dashed)
+
+// --- (可选) 背景着色，便于观察 ---
+// bgColor = weeklyImpulseStatus == 1 and screenerPlotValue > 0 ? color.new(color.green, 85) :
+//           weeklyImpulseStatus == -1 and screenerPlotValue < 0 ? color.new(color.red, 85) :
+//           na
+// bgcolor(bgColor)
+
+// --- (可选) 在K线上标记信号点 ---
+// plotshape(screenerPlotValue == 1.5, title="强买入信号", location=location.belowbar, color=color.green, style=shape.triangleup, size=size.small)
+// plotshape(screenerPlotValue == -1.5, title="强卖出信号", location=location.abovebar, color=color.red, style=shape.triangledown, size=size.small)
