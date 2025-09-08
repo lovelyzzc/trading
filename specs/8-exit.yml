@@ -1,0 +1,45 @@
+id: exit
+version: 1
+purpose: 让趋势决定利润，离场基于客观信号而非主观盈亏感觉。
+
+params:
+  supertrend_flip_exit: ${exit.supertrend_flip_exit}
+  close_below_support_bars: ${exit.close_below_support_bars}
+  partial_take_profit:
+    enabled: ${exit.partial_take_profit.enabled}
+    r_multiples: ${exit.partial_take_profit.r_multiples}
+    fractions: ${exit.partial_take_profit.fractions}
+
+inputs:
+  - direction.ml_supertrend:snapshot
+  - ENTRY_LONG.initial_stop
+
+rules:
+  - id: X1
+    name: supertrend-flip
+    when: supertrend_flip_exit and snapshot.ml_direction 从 1 翻至 -1
+    action:
+      event: EXIT_LONG
+      reason: supertrend_flip
+  - id: X2
+    name: close-below-support
+    when: 连续 close < snapshot.support_line 持续 close_below_support_bars 根
+    action:
+      event: EXIT_LONG
+      reason: structure_break
+  - id: X3
+    name: partial-tp
+    when: partial_take_profit.enabled and 浮盈达到设定 R 倍数
+    action:
+      event: PARTIAL_TP
+      fields:
+        fraction: number
+        r_multiple: number
+
+acceptance:
+  - case: trend-hold
+    expect: 未出现 X1/X2 前不离场
+  - case: trend-flip
+    expect: 触发 X1，生成 EXIT_LONG(supertrend_flip)
+  - case: break-structure
+    expect: 触发 X2，防止利润回撤扩大 

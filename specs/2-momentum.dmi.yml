@@ -1,0 +1,40 @@
+id: momentum.dmi
+version: 1
+purpose: 使用 +DI 与 -DI 确认证趋势动能。
+
+inputs:
+  candles:
+    timeframe: [D, H4, H1]
+    fields: [high, low, close]
+params:
+  period: ${indicators.dmi.period}
+  momentum_gap_threshold: ${indicators.dmi.momentum_gap_threshold}
+
+signals:
+  - id: M1
+    name: plus-di-above-minus-di
+    formula: DIplus(period) > DIminus(period)
+    output:
+      event: MOMENTUM_POSITIVE
+      fields:
+        di_plus: number
+        di_minus: number
+  - id: M2
+    name: di-gap-strong
+    formula: (DIplus(period) - DIminus(period)) > momentum_gap_threshold
+    output:
+      event: MOMENTUM_STRONG
+      fields:
+        di_gap: number
+
+acceptance:
+  - case: momentum-weak
+    given: 价格窄幅震荡
+    expect: M1/M2 触发频率低，且 M2 多为假
+  - case: momentum-strong
+    given: 强劲上升段
+    expect: M1/M2 多数为真，di_gap 显著大于阈值
+telemetry:
+  - metric: di_plus
+  - metric: di_minus
+  - metric: di_gap 

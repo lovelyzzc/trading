@@ -1,0 +1,41 @@
+id: strength.adx
+version: 1
+purpose: 以 ADX 衡量趋势强度，仅作为准入过滤器。
+
+inputs:
+  candles:
+    timeframe: [D, H4, H1]
+    fields: [open, high, low, close]
+params:
+  period: ${indicators.adx.period}
+  threshold: ${indicators.adx.threshold}
+
+signals:
+  - id: S1
+    name: ADX-above-threshold
+    desc: ADX(period) > threshold 视为强趋势环境
+    formula: ADX(period) > threshold
+    output:
+      event: STRENGTH_OK
+      fields:
+        adx: number
+        period: number
+        threshold: number
+    else_output:
+      event: STRENGTH_WEAK
+      fields:
+        adx: number
+
+notes:
+  - ADX 不分方向，仅判断“是否趋势态”。
+
+acceptance:
+  - case: flat-market
+    given: 合成震荡数据（真实高低点重合、低 ATR）
+    expect: S1 为假，连续输出 STRENGTH_WEAK
+  - case: trend-market
+    given: 单边上升数据（higher highs & higher lows）
+    expect: S1 为真，输出 STRENGTH_OK 比例显著提升
+telemetry:
+  - metric: adx_value
+  - metric: strength_flag 

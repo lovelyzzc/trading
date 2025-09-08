@@ -1,0 +1,37 @@
+id: risk
+version: 1
+purpose: 定义绝对风控边界与交易成本上限。
+
+params:
+  account_risk_pct_per_trade: ${risk.account_risk_pct_per_trade}
+  max_open_risk_pct: ${risk.max_open_risk_pct}
+  slippage_pct: ${risk.slippage_pct}
+  fee_pct: ${risk.fee_pct}
+
+rules:
+  - id: RISK1
+    name: per-trade-risk-cap
+    desc: 单笔风险以账户权益的指定百分比为上限
+    compute:
+      max_loss_amount: account_equity * account_risk_pct_per_trade
+  - id: RISK2
+    name: aggregate-open-risk-cap
+    desc: 同时持仓的未实现风险总和不得超过上限
+    check:
+      sum_open_risk_pct <= max_open_risk_pct
+  - id: RISK3
+    name: initial-stop-must-exist
+    desc: 任何 ENTRY_LONG 必须绑定初始止损
+
+outputs:
+  - event: RISK_CHECK_PASSED
+  - event: RISK_VIOLATION
+    fields:
+      violated_rule_id: string
+      details: string
+
+acceptance:
+  - case: missing-stop
+    expect: 产生 RISK_VIOLATION(RISK3)
+  - case: over-aggregate
+    expect: 拒绝新入场，提示 RISK2 违规 

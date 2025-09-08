@@ -1,0 +1,38 @@
+id: logging_and_review
+version: 1
+purpose: 统一日志与复盘产出，确保可追溯与可改进。
+
+logging:
+  level: ${logging.level}
+  sink: ${logging.sink}
+  path: ${logging.path}
+  schema:
+    - ts: string
+    - stage: string
+    - event: string
+    - symbol: string
+    - timeframe: string
+    - rule_id: string
+    - params_snapshot: object
+    - evidence_refs: object
+
+review:
+  outputs:
+    - daily_markdown: reviews/daily.md
+  sections:
+    - id: context
+      fields: [market_conditions, symbols_scanned]
+    - id: opportunities
+      fields: [signals_triggered, resonance_events]
+    - id: executions
+      fields: [entries, exits, slippage_fee, pnl, r_multiple_distribution]
+    - id: discipline
+      fields: [rule_violations, deviation_notes]
+    - id: improvements
+      fields: [what_went_well, what_to_change, experiments]
+
+acceptance:
+  - case: structured-log
+    expect: 每条事件含 rule_id 与 params_snapshot
+  - case: review-exists
+    expect: 每次运行生成一份最小可用的 `reviews/daily.md` 

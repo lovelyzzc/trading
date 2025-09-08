@@ -1,0 +1,32 @@
+id: resonance
+version: 1
+purpose: 在窗口内对齐强度/方向/动能三要素，形成最高质量机会。
+
+inputs:
+  - strength.adx:S1
+  - direction.ml_supertrend:D1
+  - momentum.dmi:M1
+  - momentum.dmi:M2
+params:
+  window_bars: ${resonance.window_bars}
+
+logic:
+  - id: R1
+    name: strong-uptrend-resonance
+    desc: 在 window_bars 内，S1==真 且 D1 发生 且 M1==真 且 M2==真
+    output:
+      event: STRONG_UPTREND_START
+      deduplicate_within_bars: ${resonance.window_bars}
+      fields:
+        s1_ts: string
+        d1_ts: string
+        m1_ts: string
+        m2_ts: string
+
+acceptance:
+  - case: scattered
+    given: 四信号时间错开超过 window
+    expect: 不产生 STRONG_UPTREND_START
+  - case: aligned
+    given: 四信号在窗口内完成
+    expect: 仅发出一次 STRONG_UPTREND_START 

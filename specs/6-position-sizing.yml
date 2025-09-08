@@ -1,0 +1,35 @@
+id: position_sizing
+version: 1
+purpose: 基于风险金额与止损距离计算下单数量。
+
+params:
+  account_risk_pct_per_trade: ${risk.account_risk_pct_per_trade}
+  min_qty: ${position_sizing.min_qty}
+  round_step: ${position_sizing.round_step}
+
+inputs:
+  - ENTRY_LONG.entry_price
+  - ENTRY_LONG.initial_stop
+  - account_equity
+
+compute:
+  - id: PS1
+    name: r-based-sizing
+    steps:
+      - risk_amount = account_equity * account_risk_pct_per_trade
+      - risk_per_unit = abs(entry_price - initial_stop)
+      - raw_qty = risk_amount / risk_per_unit
+      - qty = floor_to_step(max(raw_qty, min_qty), round_step)
+
+outputs:
+  - event: POSITION_SIZED
+    fields:
+      qty: number
+      risk_amount: number
+      risk_per_unit: number
+
+acceptance:
+  - case: tiny-stop
+    expect: qty 不小于 min_qty，且按步长取整
+  - case: wide-stop
+    expect: qty 合理变小，风险金额不超过上限 

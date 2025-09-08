@@ -1,0 +1,50 @@
+id: entry
+version: 1
+purpose: 在强单边上涨共振后，依据回调或突破规则入场。
+
+dependencies:
+  - resonance:R1
+  - direction.ml_supertrend:snapshot
+
+params:
+  buy_the_dip:
+    support_source: ${entry.buy_the_dip.support_source}
+    support_tolerance_atr: ${entry.buy_the_dip.support_tolerance_atr}
+    confirm_close_above_support: ${entry.buy_the_dip.confirm_close_above_support}
+  breakout:
+    lookback_bars: ${entry.breakout.lookback_bars}
+    require_adx_trending: ${entry.breakout.require_adx_trending}
+
+outputs:
+  - event: ENTRY_LONG
+    fields:
+      entry_price: number
+      initial_stop: number
+      entry_type: string  # dip|breakout
+      evidence:
+        support_price: number
+        atr: number
+        prior_high: number
+
+rules:
+  - id: E1
+    type: buy_the_dip
+    when: after STRONG_UPTREND_START and price pulls back to support within tolerance
+    confirm: optional close above support if enabled
+    compute:
+      entry_price: last_close
+      initial_stop: support_price - 1.0 * ATR
+  - id: E2
+    type: breakout
+    when: close > max(close[-lookback_bars:]) and (optional) ADX 上行
+    compute:
+      entry_price: last_close
+      initial_stop: recent_swing_low
+
+acceptance:
+  - case: dip-without-trend
+    expect: 不触发入场
+  - case: trend-dip
+    expect: 触发 E1，且 initial_stop 合理靠近支撑
+  - case: trend-breakout
+    expect: 触发 E2，entry_price 为有效突破价 

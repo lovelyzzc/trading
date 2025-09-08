@@ -1,0 +1,53 @@
+# 全局参数（可按市场/品种覆写）
+
+market:
+  timezone: UTC
+  symbol_universe: []  # 留空代表由运行时指定
+  data_vendor: default
+
+indicators:
+  adx:
+    period: 14
+    threshold: 25.0
+  dmi:
+    period: 14
+    momentum_gap_threshold: 5.0  # +DI - -DI > 5
+  ml_supertrend:
+    atr_period: 10
+    atr_multiplier: 3.0
+    cluster_k: 3  # 自适应灵敏度用
+
+resonance:
+  window_bars: 3  # 各信号允许在该窗口内对齐
+
+entry:
+  buy_the_dip:
+    support_source: supertrend  # 可选：supertrend | prior_swing | ema
+    support_tolerance_atr: 0.3
+    confirm_close_above_support: true
+  breakout:
+    lookback_bars: 20
+    require_adx_trending: true
+
+risk:
+  account_risk_pct_per_trade: 0.005  # 0.5%
+  max_open_risk_pct: 0.02            # 同时持仓总风险上限 2%
+  slippage_pct: 0.0005
+  fee_pct: 0.0005
+
+position_sizing:
+  min_qty: 1
+  round_step: 1
+
+exit:
+  supertrend_flip_exit: true
+  close_below_support_bars: 2
+  partial_take_profit:
+    enabled: false
+    r_multiples: [2.0, 3.0]
+    fractions: [0.33, 0.33]
+
+logging:
+  level: INFO
+  sink: file  # 可选：file | stdout | both
+  path: logs/run.log 

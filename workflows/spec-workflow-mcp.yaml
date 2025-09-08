@@ -1,0 +1,54 @@
+# spec-workflow-mcp：以规格为驱动的工作流（占位）
+
+version: 0.1
+name: trading-ssd-mcp
+
+stages:
+  - id: validate-specs
+    desc: 语法与完整性校验（规格、参数、依赖关系）
+    inputs:
+      - specs/**
+      - config/params.yaml
+    outputs: []
+
+  - id: data-ingest
+    desc: 拉取并规范化 OHLCV 数据（日线、H4、H1）
+    inputs:
+      - market.symbol_universe
+      - market.timezone
+    outputs:
+      - datasets/ohlcv.parquet
+
+  - id: signal-generation
+    desc: 依据规格计算指标与信号，产出结构化事件流
+    inputs:
+      - datasets/ohlcv.parquet
+      - specs/2-*.yml
+      - specs/3-resonance.yml
+      - config/params.yaml
+    outputs:
+      - artifacts/events.ndjson
+
+  - id: execution-simulation
+    desc: 模拟撮合、成本与滑点，生成交易记录
+    inputs:
+      - artifacts/events.ndjson
+      - specs/4-entry.yml
+      - specs/5-risk.yml
+      - specs/6-position-sizing.yml
+      - specs/8-exit.yml
+      - config/params.yaml
+    outputs:
+      - artifacts/trades.ndjson
+
+  - id: review-export
+    desc: 生成复盘材料（本地 Markdown 或对接 Notion/其他 MCP 目标）
+    inputs:
+      - artifacts/trades.ndjson
+      - specs/9-logging-and-review.yml
+    outputs:
+      - reviews/daily.md
+
+integrations:
+  notion:
+    enabled: false  # 若启用，可由 MCP 适配器推送复盘到 Notion 数据库 

@@ -1,0 +1,23 @@
+id: timeframes
+version: 1
+purpose: 日线定势（战略），H4/H1 执行（战术）。
+
+layers:
+  - id: strategic
+    timeframe: D
+    role: detect-strong-uptrend
+    outputs: STRONG_UPTREND_START
+  - id: tactical
+    timeframe: [H4, H1]
+    role: wait-entry-opportunity
+    inputs: STRONG_UPTREND_START
+
+coordination:
+  - id: TF1
+    desc: 仅当日线层标记强单边上涨后，战术层才允许评估 E1/E2 入场
+
+acceptance:
+  - case: no-daily-trend
+    expect: H4/H1 不生成 ENTRY_LONG
+  - case: daily-trend-then-entry
+    expect: 日线触发后，H4/H1 可根据回调/突破生成入场 

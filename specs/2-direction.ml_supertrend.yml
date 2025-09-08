@@ -1,0 +1,43 @@
+id: direction.ml_supertrend
+version: 1
+purpose: 提供趋势方向判定与动态支撑/阻力。
+
+inputs:
+  candles:
+    timeframe: [D, H4, H1]
+    fields: [high, low, close]
+params:
+  atr_period: ${indicators.ml_supertrend.atr_period}
+  atr_multiplier: ${indicators.ml_supertrend.atr_multiplier}
+  cluster_k: ${indicators.ml_supertrend.cluster_k}
+
+states:
+  - id: ml_direction
+    values: [-1, 1]
+  - id: support_line
+    desc: 上升趋势中的动态支撑
+
+signals:
+  - id: D1
+    name: bullish-flip
+    desc: ml_direction 从 -1 翻转到 1
+    when: prev(ml_direction) == -1 and ml_direction == 1
+    output:
+      event: DIRECTION_BULLISH_FLIP
+      fields:
+        support_price: number
+        atr: number
+
+outputs:
+  snapshot:
+    fields:
+      ml_direction: integer
+      support_line: number
+
+acceptance:
+  - case: flip-up
+    given: 序列先为下行态，后形成底部并上穿
+    expect: 仅在翻转处产生一次 DIRECTION_BULLISH_FLIP，包含 support_price
+  - case: no-chop
+    given: 噪声波动
+    expect: 不应频繁抖动 flip 事件（加入最小翻转间隔可在实现层处理） 
